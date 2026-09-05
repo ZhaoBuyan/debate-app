@@ -1,0 +1,38 @@
+# 辩论平台 · 一键部署（Docker Compose）
+#
+#   docker compose up -d --build
+#   前端: http://localhost:8080   后端: http://localhost:3000
+#
+# 首次启动自动建库并填充种子数据；数据保存在 named volume debate-data 中。
+# 删除卷可重置演示数据：docker compose down -v
+
+services:
+  server:
+    build: ./server
+    container_name: debate-server
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # 生产环境务必通过环境变量/ .env 覆盖为强随机密钥
+      JWT_SECRET: ${JWT_SECRET:-please-change-me-to-a-long-random-secret}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      # 可选：配置后启用 Groq LLM（否则自动使用本地摘要引擎）
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-llama3-70b-8192}
+    volumes:
+      - debate-data:/app/data
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    container_name: debate-client
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  debate-data:

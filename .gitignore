@@ -1,0 +1,25 @@
+# ---------- 依赖与构建 ----------
+node_modules/
+dist/
+*.tsbuildinfo
+
+# ---------- 环境与运行时数据 ----------
+.env
+.env.local
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm
+server/data/*.db-journal
+
+# ---------- 测试产物 ----------
+e2e/.tmp/
+test-results/
+playwright-report/
+blob-report/
+
+# ---------- 系统与编辑器 ----------
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

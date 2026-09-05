@@ -1,0 +1,15 @@
+{
+  "name": "debate-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "辩论平台 · Playwright 浏览器端 E2E 冒烟",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

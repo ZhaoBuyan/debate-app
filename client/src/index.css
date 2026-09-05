@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- 全局基调 ---------- */
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #0b0f19;
+  color: #f3f4f6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 页面渐变光晕背景（替代纯色底，提升层次感） */
+.app-bg {
+  background:
+    radial-gradient(900px 420px at 88% -8%, rgba(249, 115, 22, 0.08), transparent 62%),
+    radial-gradient(760px 400px at -12% 22%, rgba(168, 85, 247, 0.07), transparent 60%),
+    radial-gradient(680px 380px at 55% 112%, rgba(59, 130, 246, 0.06), transparent 60%),
+    linear-gradient(180deg, #10162a 0%, #0b0f19 46%, #0d1117 100%);
+}
+
+/* ---------- 深色滚动条 ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333a4d;
+  border-radius: 8px;
+  border: 2px solid rgba(13, 17, 23, 0.9);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #454e66;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333a4d transparent;
+}
+
+/* ---------- 文本选中 / 焦点可访问性 ---------- */
+::selection {
+  background: rgba(249, 115, 22, 0.35);
+  color: #fff;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(251, 146, 60, 0.85);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* 长列表/时间线区域的滚动更轻 */
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
