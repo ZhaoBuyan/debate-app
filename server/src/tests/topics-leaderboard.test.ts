@@ -105,9 +105,23 @@ describe("辩题众创与排行榜（D-10 / 榜单）", () => {
     const topRank = await leaderboardService.myRank(creator.id);
     assert.equal(topRank, 1);
 
-    // 活跃榜：结构校验（30 天窗口内的发言统计）
+    // 活跃榜：真实发言后应在 30 天窗口内上榜（回归：created_at 为秒级时间戳）
+    const debate = await debateService.createDebate(
+      { title: "排行榜活跃度测试辩论标题内容", type: "quick1v1" },
+      creator.id,
+    );
+    await adminService.approveDebate(admin.id, debate.id);
+    await debateService.joinDebate(debate.id, voterB.id, "B"); // 自动开赛
+    const speechService = (await import("../services/speech.service.js")).default;
+    await speechService.createSpeech({
+      debateId: debate.id,
+      userId: voterB.id,
+      content: "活跃榜回归：秒级时间戳应命中 30 天窗口内的发言",
+    });
     const active = await leaderboardService.byActivity();
-    assert.ok(Array.isArray(active));
-    assert.ok(active.every((r) => r.speech_30d! >= 1));
+    assert.ok(active.length >= 1);
+    const me = active.find((r) => r.id === voterB.id);
+    assert.ok(me, "发言者应出现在活跃榜");
+    assert.ok(me!.speech_30d! >= 1);
   });
 });

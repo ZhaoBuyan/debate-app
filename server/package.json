@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "test": "tsc && node --test dist/tests/auth.test.js dist/tests/debate.test.js dist/tests/moderation.test.js dist/tests/knowledge.test.js dist/tests/security.test.js dist/tests/integration.test.js dist/tests/topics-leaderboard.test.js"
+    "test": "tsc && node --test dist/tests/auth.test.js dist/tests/debate.test.js dist/tests/moderation.test.js dist/tests/knowledge.test.js dist/tests/security.test.js dist/tests/integration.test.js dist/tests/topics-leaderboard.test.js",
+    "demo": "tsc && node dist/scripts/demo-data.js"
   },
   "dependencies": {
     "express": "^4.18.2",

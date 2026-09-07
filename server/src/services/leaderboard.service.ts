@@ -30,7 +30,8 @@ export class LeaderboardService {
    */
   async byActivity(): Promise<LeaderboardRow[]> {
     const db = await getDb();
-    const since = Date.now() - THIRTY_DAYS;
+    // created_at 为秒级 unix 时间戳（与毫秒区分！）
+    const since = Math.floor(Date.now() / 1000) - THIRTY_DAYS / 1000;
     return db.all<LeaderboardRow[]>(
       `SELECT u.id, u.username, u.avatar, u.role, u.points, u.rank, u.wins, u.losses,
               COUNT(s.id) as speech_30d
