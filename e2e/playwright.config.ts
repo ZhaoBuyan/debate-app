@@ -22,16 +22,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
 
-  globalSetup: "./global-setup.ts",
-
   webServer: [
     {
-      // 后端：独立测试库，每次运行前自动重建种子数据
+      // 后端：runner 自含构建，不依赖 dist 预先存在（CI 兼容）
       command: "node server-runner.cjs",
       cwd: path.join(__dirname),
       url: "http://localhost:3110/api/health",
       reuseExistingServer: !process.env.CI,
-      timeout: 40_000,
+      timeout: 90_000,
     },
     {
       // 前端：vite dev server（需在 client 目录下运行）
