@@ -7,11 +7,12 @@ import { spawnSync } from "child_process";
 
 export default function globalSetup() {
   // 1. 构建后端（dist 是 webServer 启动的产物）
+  // 注意：npm 在 Windows 是 .cmd、Linux 是 shell 脚本，必须走 shell 执行
   const serverDir = path.join(__dirname, "..", "server");
-  const build = spawnSync("npm", ["run", "build"], {
+  const build = spawnSync("npm run build", {
     cwd: serverDir,
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: true,
   });
   if (build.status !== 0) {
     throw new Error("❌ server 构建失败，E2E 终止");
