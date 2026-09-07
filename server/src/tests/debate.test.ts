@@ -298,6 +298,61 @@ describe("辩题与辩论生命周期（D/B/S/V/A 系列）", () => {
     assert.equal(tree[0].content.includes("正方论点一"), true);
   });
 
+  it("辩论阶段（B-05/B-06）：全员发言后自动进入自由辩论；总结陈词每方限一条", async () => {
+    const { id } = await debateService.createDebate(
+      { title: "辩论阶段回归测试辩题标题内容", type: "quick1v1" },
+      creator.id,
+    );
+    await adminService.approveDebate(admin.id, id);
+    await debateService.joinDebate(id, debaterB.id, "B"); // 自动开始
+
+    // 初始 formal
+    assert.equal(await debateService.getPhase(id), "formal");
+    // 未全员发言时不可跳阶段
+    await assert.rejects(debateService.setPhase(id, "summary"), /顺序推进/);
+
+    // creator 发言一次 → 尚未全员 → 仍 formal
+    await speechService.createSpeech({ debateId: id, userId: creator.id, content: "正式轮辩正方发言测试内容" });
+    assert.equal(await debateService.getPhase(id), "formal");
+    // debaterB 发言 → 全员已发言 → 自动 free
+    await speechService.createSpeech({ debateId: id, userId: debaterB.id, content: "正式轮辩反方发言测试内容" });
+    assert.equal(await debateService.getPhase(id), "free");
+
+    // 自由辩论后可进入总结陈词
+    await debateService.setPhase(id, "summary");
+    // 已进入 summary 不可回退/再进
+    await assert.rejects(debateService.setPhase(id, "free"), /顺序推进/);
+
+    // 总结陈词：反方先总结成功，正方的总结也能发，但同方第二条被拒
+    const sum1 = await speechService.createSpeech({
+      debateId: id,
+      userId: debaterB.id,
+      content: "反方总结陈词：综上所述我方观点成立。",
+    });
+    assert.equal(sum1.is_summary, 1);
+    await speechService.createSpeech({
+      debateId: id,
+      userId: creator.id,
+      content: "正方总结陈词：综上我方立场不变。",
+    });
+    await assert.rejects(
+      speechService.createSpeech({
+        debateId: id,
+        userId: debaterB.id,
+        content: "反方想再补一条总结内容测试",
+      }),
+      /每方仅限一条/,
+    );
+    await assert.rejects(
+      speechService.createSpeech({
+        debateId: id,
+        userId: creator.id,
+        content: "正方也想再补一条总结内容测试",
+      }),
+      /每方仅限一条/,
+    );
+  });
+
   it("精彩时刻：按发言聚合情绪并计算影响力（I-03/S-05 简化版）", async () => {
     const { id } = await debateService.createDebate(
       { title: "精彩时刻回归测试辩题标题内容", category: "general", type: "quick1v1" },

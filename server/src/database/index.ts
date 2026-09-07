@@ -323,18 +323,27 @@ async function createTables(db: Database) {
     )
   `);
 
-  // ---------- 辩题提议（众创） ----------
+  // ---------- 辩题提议（众创，D-10） ----------
   await db.exec(`
     CREATE TABLE IF NOT EXISTS topic_proposals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL UNIQUE,
       description TEXT,
-      proposer_id TEXT NOT NULL,
-      votes INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected', 'scheduled')),
+      category TEXT NOT NULL DEFAULT 'general',
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-      FOREIGN KEY (proposer_id) REFERENCES users(id) ON DELETE CASCADE
-    )
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_proposals_created ON topic_proposals(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS topic_proposal_votes (
+      proposal_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (proposal_id, user_id),
+      FOREIGN KEY (proposal_id) REFERENCES topic_proposals(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   // ---------- 情绪记录 ----------
@@ -375,34 +384,64 @@ async function createTables(db: Database) {
  * 轻量迁移：为历史库补充新版本新增的列（幂等）
  */
 async function migrateLegacyTables(db: Database) {
-  const cols = await db.all<{ name: string }[]>(
-    "PRAGMA table_info(debates)",
+  // 旧版众创表结构（proposer_id 方案）检测并重建为统一结构
+  const legacy = await db.all<{ name: string }[]>(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='topic_proposals'",
   );
-  const names = cols.map((c) => c.name);
-  const addIfMissing = async (col: string, ddl: string) => {
-    if (!names.includes(col)) {
-      await db.exec(`ALTER TABLE debates ADD COLUMN ${ddl}`);
+  if (legacy.length > 0) {
+    const cols = await db.all<{ name: string }[]>("PRAGMA table_info(topic_proposals)");
+    if (!cols.some((c) => c.name === "user_id")) {
+      await db.exec(
+        "DROP TABLE IF EXISTS topic_proposal_votes; DROP TABLE topic_proposals;",
+      );
+      console.log("♻️ 众创表已按新结构重建（旧结构为空，无数据损失）");
+    }
+  }
+
+  // 幂等：按表补列（历史库升级用）
+  const addCol = async (table: string, col: string, ddl: string) => {
+    const cols = await db.all<{ name: string }[]>(`PRAGMA table_info(${table})`);
+    if (!cols.some((c) => c.name === col)) {
+      await db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
     }
   };
+
   // 辩论形式（standard 8人 / quick1v1 每方1人）
-  await addIfMissing(
-    "debate_type",
-    "debate_type TEXT NOT NULL DEFAULT 'classic'",
-  );
+  await addCol("debates", "debate_type", "debate_type TEXT NOT NULL DEFAULT 'classic'");
   // 社区公约：冷静期（分钟），加入后需等待方可发言
-  await addIfMissing(
-    "cool_down_minutes",
-    "cool_down_minutes INTEGER NOT NULL DEFAULT 0",
-  );
+  await addCol("debates", "cool_down_minutes", "cool_down_minutes INTEGER NOT NULL DEFAULT 0");
   // 积分结算标记（防重复结算）
-  await addIfMissing(
-    "settled",
-    "settled INTEGER NOT NULL DEFAULT 0",
-  );
-  // 内容运营：编辑精选标记 + 精选时间
-  await addIfMissing(
-    "curated",
-    "curated INTEGER NOT NULL DEFAULT 0",
-  );
-  await addIfMissing("curated_at", "curated_at INTEGER");
+  await addCol("debates", "settled", "settled INTEGER NOT NULL DEFAULT 0");
+  // 辩论阶段（formal 正式轮转 → free 自由辩论 → summary 总结陈词）
+  await addCol("debates", "phase", "phase TEXT NOT NULL DEFAULT 'formal'");
+  // 总结陈词标记（summary 阶段每方仅限一次）
+  await addCol("speeches", "is_summary", "is_summary INTEGER NOT NULL DEFAULT 0");
+
+  // ---------- 辩题众创（D-10） ----------
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS topic_proposals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL UNIQUE,
+      description TEXT,
+      category TEXT NOT NULL DEFAULT 'general',
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_proposals_created ON topic_proposals(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS topic_proposal_votes (
+      proposal_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      PRIMARY KEY (proposal_id, user_id),
+      FOREIGN KEY (proposal_id) REFERENCES topic_proposals(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // 排行榜索引
+  await db.exec("CREATE INDEX IF NOT EXISTS idx_users_points ON users(points DESC);");
+  await addCol("debates", "curated", "curated INTEGER NOT NULL DEFAULT 0");
+  await addCol("debates", "curated_at", "curated_at INTEGER");
 }

@@ -24,6 +24,8 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
   });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [ended, setEnded] = useState(false);
+  /** 辩论阶段（B-05/B-06），room_state 与 debate_phase 事件驱动 */
+  const [phase, setPhase] = useState<"formal" | "free" | "summary">("formal");
 
   const socketRef = useRef<DebateSocket | null>(null);
   const debateIdRef = useRef(debateId);
@@ -61,6 +63,7 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
 
     const onRoomState = (data: RoomData) => {
       setRoom(data);
+      setPhase(data.phase || "formal");
       setEmotions({
         fire: data.emotions?.fire || 0,
         agree: data.emotions?.agree || 0,
@@ -134,6 +137,14 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       pushToast("info", "🏁 辩论已结束");
       socket.emit("join_room", { debateId, userId }); // 刷新终态
     };
+    const onDebatePhase = (data: { phase: "formal" | "free" | "summary" }) => {
+      setPhase(data.phase);
+      if (data.phase === "free") {
+        pushToast("info", "🗣️ 进入自由辩论阶段（B-05）");
+      } else if (data.phase === "summary") {
+        pushToast("info", "🎤 进入总结陈词阶段：每方仅限一条（B-06）");
+      }
+    };
     const onUserMuted = ({ userId: mutedId, duration }: { userId: string; duration: number }) => {
       if (mutedId === userId) {
         pushToast("error", `你已被禁言 ${Math.round(duration / 1000)} 秒`);
@@ -170,6 +181,7 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
     socket.on("emotion_updated", onEmotionUpdated);
     socket.on("round_changed", onRoundChanged);
     socket.on("debate_started", onDebateStarted);
+    socket.on("debate_phase", onDebatePhase);
     socket.on("debate_ended", onDebateEnded);
     socket.on("debate_force_ended", onDebateEnded);
     socket.on("user_muted", onUserMuted);
@@ -194,6 +206,7 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       socket.off("emotion_updated", onEmotionUpdated);
       socket.off("round_changed", onRoundChanged);
       socket.off("debate_started", onDebateStarted);
+      socket.off("debate_phase", onDebatePhase);
       socket.off("debate_ended", onDebateEnded);
       socket.off("debate_force_ended", onDebateEnded);
       socket.off("user_muted", onUserMuted);
@@ -310,6 +323,7 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
     emotions,
     toasts,
     ended,
+    phase,
     showError,
     pushToast,
     sendSpeech,

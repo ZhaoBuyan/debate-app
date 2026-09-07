@@ -8,3 +8,4 @@ export * from "./support";
 export * from "./report";
 export * from "./socket";
 export * from "./message";
+export * from "./topic";

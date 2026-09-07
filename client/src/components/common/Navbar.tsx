@@ -22,6 +22,8 @@ function Navbar({ user, isAdmin, onLogout, onToast }: Props) {
   const items = [
     { to: "/debates", label: "🏟️ 辩题大厅" },
     { to: "/create", label: "➕ 创建辩题" },
+    { to: "/leaderboard", label: "🏆 排行" },
+    { to: "/topics", label: "💡 众创" },
     { to: "/profile", label: "👤 个人资料" },
     ...(isAdmin ? [{ to: "/admin", label: "🛡️ 管理后台" }] : []),
   ];

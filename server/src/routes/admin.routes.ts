@@ -13,6 +13,9 @@ import {
   rejectDebate,
   forceEndDebate,
   curateDebate,
+  setDebatePhase,
+  adoptTopic,
+  removeTopic,
   listReports,
   handleReport,
   listSensitiveWords,
@@ -49,6 +52,11 @@ router.put("/debates/:id/approve", approveDebate);
 router.put("/debates/:id/reject", rejectDebate);
 router.post("/debates/:id/force-end", forceEndDebate);
 router.put("/debates/:id/curate", curateDebate);
+router.put("/debates/:id/phase", setDebatePhase);
+
+// 众创管理（D-10）
+router.post("/topics/:id/adopt", adoptTopic);
+router.delete("/topics/:id", removeTopic);
 
 // 举报处理（AD-06）
 router.get("/reports", listReports);

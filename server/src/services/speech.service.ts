@@ -25,8 +25,8 @@ export class SpeechService {
     const db = await getDb();
 
     // 1. 检查辩论是否进行中
-    const debate = await db.get<{ status: string }>(
-      "SELECT status FROM debates WHERE id = ?",
+    const debate = await db.get<{ status: string; phase: string }>(
+      "SELECT status, phase FROM debates WHERE id = ?",
       [debateId],
     );
     if (!debate) throw new Error("辩题不存在");
@@ -47,6 +47,20 @@ export class SpeechService {
       throw new Error(
         `🧊 本场设有冷静期（社区公约），请先冷静思考，还需 ${Math.ceil(remain / 1000)} 秒后才能发言`,
       );
+    }
+
+    // 2.6 总结陈词阶段（B-06）：每方仅限一条总结发言
+    const isSummarySpeech = debate.phase === "summary";
+    if (isSummarySpeech) {
+      const sideSummary = await db.get<{ n: number }>(
+        `SELECT COUNT(*) n FROM speeches s
+         JOIN debaters d ON d.debate_id = s.debate_id AND d.user_id = s.user_id
+         WHERE s.debate_id = ? AND s.is_summary = 1 AND d.side = ?`,
+        [debateId, debater.side],
+      );
+      if ((sideSummary?.n || 0) > 0) {
+        throw new Error("🎤 总结陈词每方仅限一条，本方的总结已发表");
+      }
     }
 
     // 3. 计算轮次与顺序
@@ -73,9 +87,18 @@ export class SpeechService {
 
     // 5. 插入发言
     const result = await db.run(
-      `INSERT INTO speeches (debate_id, user_id, content, summary, round, order_index, input_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [debateId, userId, filtered, summary, round, orderIndex, inputType],
+      `INSERT INTO speeches (debate_id, user_id, content, summary, round, order_index, input_type, is_summary)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        debateId,
+        userId,
+        filtered,
+        summary,
+        round,
+        orderIndex,
+        inputType,
+        isSummarySpeech ? 1 : 0,
+      ],
     );
 
     // 6. 获取完整发言信息（含用户信息）

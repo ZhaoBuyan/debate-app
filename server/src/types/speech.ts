@@ -11,6 +11,8 @@ export interface Speech {
   round: number;
   order_index: number;
   input_type: InputType;
+  /** 总结陈词标记（B-06：summary 阶段发言） */
+  is_summary?: number;
   created_at: number;
 }
 

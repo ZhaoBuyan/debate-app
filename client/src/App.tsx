@@ -6,6 +6,9 @@ import DebateRoom from "./pages/DebateRoom";
 import CreateDebate from "./pages/CreateDebate";
 import AdminPanel from "./pages/AdminPanel";
 import Profile from "./pages/Profile";
+import PublicProfile from "./pages/PublicProfile";
+import Leaderboard from "./pages/Leaderboard";
+import Topics from "./pages/Topics";
 import DebateChain from "./pages/DebateChain";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import useAuth from "./hooks/useAuth";
@@ -86,6 +89,30 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Profile />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/topics"
+        element={
+          <RequireAuth>
+            <Topics />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/leaderboard"
+        element={
+          <RequireAuth>
+            <Leaderboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/u/:id"
+        element={
+          <RequireAuth>
+            <PublicProfile />
           </RequireAuth>
         }
       />

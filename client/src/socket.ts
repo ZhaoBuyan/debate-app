@@ -48,6 +48,7 @@ export interface ServerToClientEvents {
   debate_started: () => void;
   debate_ended: () => void;
   debate_force_ended: () => void;
+  debate_phase: (data: { phase: "formal" | "free" | "summary" }) => void;
   round_changed: (data: { round: number; speakerId: string }) => void;
   user_muted: (data: { userId: string; duration: number }) => void;
   user_unmuted: (data: { userId: string }) => void;

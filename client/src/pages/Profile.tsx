@@ -123,6 +123,13 @@ function Profile() {
           <div className="text-center sm:text-left">
             <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
               <h1 className="text-xl font-bold">{p.username}</h1>
+              <Link
+                to={`/u/${p.id}`}
+                className="text-[11px] px-2 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition"
+                title="查看我的公开主页（C4）"
+              >
+                🌐 公开主页
+              </Link>
               <span className={`text-xs px-2 py-0.5 rounded-full border ${rankChipClass(p.rank)}`}>
                 {rankIcon(p.rank)} {p.rank}
               </span>

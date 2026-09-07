@@ -9,6 +9,9 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/auth.routes.js";
 import debateRoutes from "./routes/debate.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import topicsRoutes from "./routes/topics.routes.js";
+import leaderboardRoutes from "./routes/leaderboard.routes.js";
+import userRoutes from "./routes/user.routes.js";
 
 // 中间件
 import { rateLimiter } from "./middleware/rateLimit.js";
@@ -16,6 +19,7 @@ import { securityHeaders } from "./middleware/security.js";
 
 // Socket 处理
 import { setupSocket, ADMIN_ROOM } from "./socket/index.js";
+import { setIo, clearIo } from "./socket/io-bus.js";
 
 // 工具
 import { logger } from "./utils/logger.js";
@@ -107,6 +111,9 @@ export class App {
     });
     // 管理路由（内部统一 admin 权限校验）
     this.app.use("/api/admin", adminRoutes);
+    this.app.use("/api/topics", topicsRoutes);
+    this.app.use("/api/leaderboard", leaderboardRoutes);
+    this.app.use("/api/users", userRoutes);
 
     // 404 处理
     this.app.use("*", (req: Request, res: Response) => {
@@ -187,6 +194,7 @@ export class App {
         },
       );
       setupSocket(this.io);
+    setIo(this.io);
 
       // 4. 启动自动调度：到点自动开始的辩论（D-07），每 10 秒检查一次
       this.autoStartTimer = setInterval(async () => {
@@ -250,6 +258,7 @@ export class App {
     if (this.io) {
       await this.io.close();
     }
+    clearIo();
     this.httpServer.close(() => {
       logger.info("✅ 服务器已关闭");
       process.exit(0);

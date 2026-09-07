@@ -17,6 +17,8 @@ import type {
   MyActivities,
   RelatedDebate,
   Report,
+  TopicProposal,
+  LeaderboardPayload,
   SearchPayload,
   SensitiveWord,
   Speech,
@@ -198,6 +200,46 @@ export const api = {
   /** 相关辩题推荐（KN-03，辩论室侧栏） */
   async getRelated(id: string): Promise<RelatedDebate[]> {
     const res = await http.get(`/debates/${id}/related`);
+    return unwrap(res as any);
+  },
+  /** 管理员：推进辩论阶段（B-05/B-06） */
+  async adminSetPhase(id: string, phase: "free" | "summary") {
+    const res = await http.put(`/admin/debates/${id}/phase`, { phase });
+    return unwrap(res as any);
+  },
+  /** 众创列表 */
+  async listTopics(): Promise<TopicProposal[]> {
+    const res = await http.get("/topics");
+    return unwrap(res as any);
+  },
+  /** 提交众创提案 */
+  async createTopic(input: { title: string; description?: string; category: DebateCategory }): Promise<TopicProposal> {
+    const res = await http.post("/topics", input);
+    return unwrap(res as any);
+  },
+  /** 众创投票（toggle） */
+  async voteTopic(id: number): Promise<{ voted: boolean; voteCount: number }> {
+    const res = await http.post(`/topics/${id}/vote`);
+    return unwrap(res as any);
+  },
+  /** 管理员：采纳众创提案 */
+  async adminAdoptTopic(id: number) {
+    const res = await http.post(`/admin/topics/${id}/adopt`);
+    return unwrap(res as any);
+  },
+  /** 管理员：移除众创提案 */
+  async adminRemoveTopic(id: number) {
+    const res = await http.delete(`/admin/topics/${id}`);
+    return unwrap(res as any);
+  },
+  /** 排行榜 */
+  async leaderboard(type: "points" | "active" = "points"): Promise<LeaderboardPayload> {
+    const res = await http.get("/leaderboard", { params: { type, me: "1" } });
+    return unwrap(res as any);
+  },
+  /** 公开个人主页（C4） */
+  async publicProfile(userId: string): Promise<MyActivities> {
+    const res = await http.get(`/users/${userId}`);
     return unwrap(res as any);
   },
   /** 内容运营榜单（编辑精选/正在直播/人气复盘） */

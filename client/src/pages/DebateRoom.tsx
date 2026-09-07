@@ -61,6 +61,101 @@ function TurnTimer({ baseTs, active }: { baseTs: number | null; active: boolean 
 }
 
 // ---------- 发言卡片 ----------
+/** 生成金句分享卡（I-04）：1200×630 PNG，零依赖 canvas 绘制 */
+function downloadQuoteCard(opts: {
+  title: string;
+  content: string;
+  username: string;
+  avatar: string;
+}): Promise<void> {
+  const { title, content, username, avatar } = opts;
+  const W = 1200;
+  const H = 630;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.reject(new Error("canvas 不可用"));
+
+  // 背景：深色渐变 + 光晕
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#1c1f36");
+  bg.addColorStop(0.55, "#141828");
+  bg.addColorStop(1, "#0d1117");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  const glow = ctx.createRadialGradient(W * 0.85, H * 0.1, 0, W * 0.85, H * 0.1, 500);
+  glow.addColorStop(0, "rgba(249,115,22,0.16)");
+  glow.addColorStop(1, "rgba(249,115,22,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  const glow2 = ctx.createRadialGradient(W * 0.1, H * 0.9, 0, W * 0.1, H * 0.9, 420);
+  glow2.addColorStop(0, "rgba(168,85,247,0.14)");
+  glow2.addColorStop(1, "rgba(168,85,247,0)");
+  ctx.fillStyle = glow2;
+  ctx.fillRect(0, 0, W, H);
+
+  // 内边框
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(48, 48, W - 96, H - 96);
+
+  const font = `"Microsoft YaHei", "PingFang SC", sans-serif`;
+  ctx.fillStyle = "#fb923c";
+  ctx.font = `bold 42px ${font}`;
+  ctx.fillText("🗣️ 辩论平台", 88, 130);
+  ctx.font = `600 28px ${font}`;
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText("辩题 · " + (title.length > 40 ? title.slice(0, 40) + "…" : title), 88, 185);
+
+  // 金句正文（自动换行，最多 7 行）
+  ctx.font = `400 40px ${font}`;
+  ctx.fillStyle = "#f3f4f6";
+  const maxWidth = W - 2 * 110;
+  const lines: string[] = [];
+  let cur = "";
+  for (const ch of content) {
+    if (ctx.measureText(cur + ch).width > maxWidth) {
+      lines.push(cur);
+      cur = ch;
+      if (lines.length === 6) break;
+    } else {
+      cur += ch;
+    }
+  }
+  if (lines.length < 7 && cur) lines.push(cur);
+  let y = 275;
+  for (const line of lines) {
+    ctx.fillText(line, 110, y);
+    y += 58;
+  }
+  if (lines.length === 7) {
+    ctx.fillText("……", 110, y);
+  }
+
+  // 底部署名
+  const footerY = H - 108;
+  ctx.font = `400 32px ${font}`;
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(`${avatar}  ${username}`, 110, footerY);
+  ctx.font = `400 26px ${font}`;
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  ctx.fillText("让思想有秩序地交锋 · 观众票选金句", 110, footerY + 42);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return reject(new Error("图片生成失败"));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `金句-${username}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      resolve();
+    }, "image/png");
+  });
+}
+
 function SpeechItem({
   speech,
   isAdmin,
@@ -91,6 +186,14 @@ function SpeechItem({
         </span>
         <span className="text-[10px] text-gray-500">第 {speech.round} 轮</span>
         <span className="text-[10px] text-gray-500 ml-auto">{time}</span>
+        {!!speech.is_summary && (
+          <span
+            className="text-[10px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40"
+            title="总结陈词（B-06）"
+          >
+            🎤 总结陈词
+          </span>
+        )}
         {speech.input_type === "voice" && <span title="语音输入">🎙️</span>}
         {speech.input_type === "sign" && <span title="手语输入">🤟</span>}
         {isAdmin && (
@@ -152,7 +255,7 @@ function DebateRoom() {
   const [loading, setLoading] = useState(true);
 
   const hook = useDebateRoom(id, user?.id);
-  const { room, my, connected, ended } = hook;
+  const { room, my, connected, ended, phase } = hook;
   const [searchParams] = useSearchParams();
   // 搜索直达的发言定位（?focus=<speechId>）
   const focusSpeechId = searchParams.get("focus")
@@ -435,22 +538,52 @@ function DebateRoom() {
               <span className="text-gray-400">{debate!.description}</span>
             )}
             {isAdmin && status === "ongoing" && (
-              <button
-                onClick={() => {
-                  if (window.confirm("确认强制结束本场辩论？（AD-12）")) {
-                    api
-                      .adminForceEnd(id!)
-                      .then(() => {
-                        hook.refresh();
-                        refreshUser();
-                      })
-                      .catch((e) => hook.showError(errMsg(e)));
-                  }
-                }}
-                className="ml-auto text-xs px-2.5 py-1 rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition"
-              >
-                ⛔ 强制结束
-              </button>
+              <span className="ml-auto flex items-center gap-2">
+                {phase === "formal" && (
+                  <button
+                    onClick={() => {
+                      api
+                        .adminSetPhase(id!, "free")
+                        .then(() => hook.refresh())
+                        .catch((e) => hook.showError(errMsg(e)));
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-purple-600/80 hover:bg-purple-600 text-white transition"
+                    title="B-05：全员首轮发言后进入自由辩论"
+                  >
+                    🗣️ 进入自由辩论
+                  </button>
+                )}
+                {phase === "free" && (
+                  <button
+                    onClick={() => {
+                      api
+                        .adminSetPhase(id!, "summary")
+                        .then(() => hook.refresh())
+                        .catch((e) => hook.showError(errMsg(e)));
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white transition"
+                    title="B-06：每方代表完成总结陈词后可结束辩论"
+                  >
+                    🎤 进入总结陈词
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (window.confirm("确认强制结束本场辩论？（AD-12）")) {
+                      api
+                        .adminForceEnd(id!)
+                        .then(() => {
+                          hook.refresh();
+                          refreshUser();
+                        })
+                        .catch((e) => hook.showError(errMsg(e)));
+                    }
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition"
+                >
+                  ⛔ 强制结束
+                </button>
+              </span>
             )}
           </div>
         </header>
@@ -458,33 +591,62 @@ function DebateRoom() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* ============ 左 2/3：辩论区 ============ */}
           <main className="lg:col-span-2 space-y-4 min-w-0">
-            {/* 轮次横幅 */}
-            {status === "ongoing" && room?.turn && (
+            {/* 轮次/阶段横幅 */}
+            {status === "ongoing" && (
               <div className="rounded-xl border border-gray-700 bg-gradient-to-r from-orange-500/[0.08] via-gray-800/70 to-blue-500/[0.08] px-4 py-3 flex flex-wrap items-center gap-3">
-                <span className="text-sm font-semibold">
-                  第 {room.turn.round} 轮
+                <span
+                  className={`px-2 py-0.5 rounded-md text-xs font-semibold border ${
+                    phase === "formal"
+                      ? "bg-blue-500/15 border-blue-500/40 text-blue-200"
+                      : phase === "free"
+                        ? "bg-purple-500/15 border-purple-500/40 text-purple-200"
+                        : "bg-amber-500/15 border-amber-500/40 text-amber-200"
+                  }`}
+                >
+                  {phase === "formal" ? "🎙️ 正式轮辩" : phase === "free" ? "🗣️ 自由辩论" : "🎤 总结陈词"}
                 </span>
-                <span className="text-sm">
-                  🎤 当前发言：
-                  {room.turn.speaker ? (
-                    <b
-                      className={
-                        room.turn.speaker.side === "A" ? "text-red-300" : "text-blue-300"
-                      }
-                    >
-                      {SIDE_LABELS[room.turn.speaker.side]} {room.turn.speaker.username}
-                    </b>
-                  ) : (
-                    <span className="text-gray-400">（未开始）</span>
-                  )}
-                </span>
-                <TurnTimer
-                  baseTs={lastSpeechTs}
-                  active={status === "ongoing" && !!room.turn.speaker}
-                />
-                {isMyTurn && (
-                  <span className="text-orange-300 text-sm animate-pulse font-medium">
-                    👉 轮到你了！
+
+                {phase === "formal" && room?.turn ? (
+                  <>
+                    <span className="text-sm font-semibold">
+                      第 {room.turn.round} 轮
+                    </span>
+                    <span className="text-sm">
+                      🎤 当前发言：
+                      {room.turn.speaker ? (
+                        <b
+                          className={
+                            room.turn.speaker.side === "A"
+                              ? "text-red-300"
+                              : "text-blue-300"
+                          }
+                        >
+                          {SIDE_LABELS[room.turn.speaker.side]}{" "}
+                          {room.turn.speaker.username}
+                        </b>
+                      ) : (
+                        <span className="text-gray-400">（未开始）</span>
+                      )}
+                    </span>
+                    <TurnTimer
+                      baseTs={lastSpeechTs}
+                      active={!!room.turn.speaker}
+                    />
+                    {isMyTurn && (
+                      <span className="text-orange-300 text-sm animate-pulse font-medium">
+                        👉 轮到你了！
+                      </span>
+                    )}
+                  </>
+                ) : phase === "free" ? (
+                  <span className="text-sm text-gray-300">
+                    首轮交锋已完成，进入<b className="text-purple-300"> 自由辩论 </b>
+                    阶段：聚焦主题、有序交锋（B-05）
+                  </span>
+                ) : (
+                  <span className="text-sm text-gray-300">
+                    每方仅限一条<b className="text-amber-300"> 总结陈词 </b>
+                    （B-06），代表完成最终陈词后可结束辩论
                   </span>
                 )}
               </div>
@@ -1090,6 +1252,23 @@ function DebateRoom() {
                               className="mt-2 text-[11px] px-2 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 transition"
                             >
                               📋 复制金句分享
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                downloadQuoteCard({
+                                  title: debate!.title,
+                                  content: h.content,
+                                  username: h.username,
+                                  avatar: h.avatar,
+                                })
+                                  .then(() => hook.pushToast("success", "🖼️ 分享图已生成！"))
+                                  .catch(() => hook.showError("图片生成失败"));
+                              }}
+                              className="mt-2 text-[11px] px-2 py-1 rounded-lg bg-orange-600/80 hover:bg-orange-600 text-white transition"
+                              title="生成 1200×630 分享卡片（I-04）"
+                            >
+                              🖼️ 生成分享图
                             </button>
                           </div>
                         ))}

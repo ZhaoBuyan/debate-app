@@ -5,6 +5,7 @@ import adminService from "../services/admin.service.js";
 import reportService from "../services/report.service.js";
 import sensitiveService from "../services/sensitive.service.js";
 import debateService from "../services/debate.service.js";
+import { getIo } from "../socket/io-bus.js";
 
 const adminIdOf = (req: Request): string => (req as any).user?.id || "";
 
@@ -128,12 +129,75 @@ export async function rejectDebate(req: Request, res: Response) {
   }
 }
 
-/** POST /api/admin/debates/:id/force-end 强制结束辩论（AD-12） */
+/** POST /api/admin/debates/:id/force-end 强制结束辩论（AD-12，REST 路径也广播） */
 export async function forceEndDebate(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const { reason } = req.body;
     await adminService.forceEndDebate(adminIdOf(req), id, reason);
+    getIo()?.to(`debate:${id}`).emit("debate_ended");
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+}
+
+/** PUT /api/admin/debates/:id/phase 推进辩论阶段（B-05 自由辩论 / B-06 总结陈词） */
+export async function setDebatePhase(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { phase } = req.body;
+    if (phase !== "free" && phase !== "summary") {
+      return res.status(400).json({ success: false, error: "阶段不合法" });
+    }
+    const result = await debateService.setPhase(id, phase);
+    await adminService.logAction(
+      adminIdOf(req),
+      "set_phase",
+      "debate",
+      id,
+      `阶段切换 → ${phase}`,
+    );
+    // 实时广播给房间内所有在线用户
+    getIo()?.to(`debate:${id}`).emit("debate_phase", { phase: result.phase });
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+}
+
+/** POST /api/admin/topics/:id/adopt 采纳众创提案为正式辩题（D-10） */
+export async function adoptTopic(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, error: "参数不合法" });
+    }
+    const topicsService = (await import("../services/topics.service.js")).default;
+    const created = await topicsService.adopt(id);
+    await adminService.logAction(
+      adminIdOf(req),
+      "adopt_topic",
+      "proposal",
+      id,
+      `采纳众创提案 → 新辩题 ${created.id}`,
+    );
+    res.json({ success: true, data: created });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+}
+
+/** DELETE /api/admin/topics/:id 移除众创提案 */
+export async function removeTopic(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ success: false, error: "参数不合法" });
+    }
+    const topicsService = (await import("../services/topics.service.js")).default;
+    await topicsService.remove(id);
+    await adminService.logAction(adminIdOf(req), "remove_topic", "proposal", id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error.message });

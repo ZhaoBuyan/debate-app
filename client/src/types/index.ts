@@ -134,6 +134,14 @@ export type DebateStatus =
   | "finished"
   | "rejected";
 
+export type DebatePhase = "formal" | "free" | "summary";
+
+export const PHASE_LABELS: Record<DebatePhase, string> = {
+  formal: "正式轮辩",
+  free: "自由辩论",
+  summary: "总结陈词",
+};
+
 export type DebateCategory =
   | "general"
   | "tech"
@@ -161,6 +169,7 @@ export interface Debate {
   status: DebateStatus;
   debate_type: DebateType;
   cool_down_minutes: number;
+  phase?: DebatePhase;
   start_time: number;
   end_time: number | null;
   admin_note: string | null;
@@ -227,6 +236,8 @@ export interface Speech {
   round: number;
   order_index: number;
   input_type: "text" | "voice" | "sign";
+  /** 总结陈词标记（B-06） */
+  is_summary?: number;
   created_at: number;
   username: string;
   side: "A" | "B";
@@ -278,7 +289,43 @@ export interface RoomData {
   support: SupportStats;
   supportHistory: { timestamp: number; rateA: number; rateB: number; sideA: number; sideB: number }[];
   emotions: Record<"fire" | "agree" | "clap", number>;
+  /** 辩论阶段：正式轮辩 / 自由辩论 / 总结陈词 */
+  phase: DebatePhase;
   turn: { round: number; index: number; speaker: Debater | null };
+}
+
+// ---- 众创 / 排行榜（D-10） ----
+
+export interface TopicProposal {
+  id: number;
+  user_id: string;
+  title: string;
+  description: string | null;
+  category: DebateCategory;
+  created_at: number;
+  username?: string;
+  vote_count?: number;
+  voted?: boolean;
+}
+
+export interface LeaderboardRow {
+  id: string;
+  username: string;
+  avatar: string;
+  role: string;
+  points: number;
+  rank: string;
+  wins: number;
+  losses: number;
+  speech_total?: number;
+  speech_30d?: number;
+  win_rate?: number;
+}
+
+export interface LeaderboardPayload {
+  type: "points" | "active";
+  list: LeaderboardRow[];
+  meRank?: number | null;
 }
 
 // ---- 管理后台 ----

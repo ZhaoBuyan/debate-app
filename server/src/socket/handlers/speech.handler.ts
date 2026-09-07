@@ -49,6 +49,7 @@ export function registerSpeechHandlers(ctx: HandlerContext) {
       }
 
       // 3. 保存发言（含 AI 提炼摘要与敏感词过滤）
+      const beforePhase = await debateService.getPhase(debateId);
       const speech = await speechService.createSpeech({
         debateId,
         userId: user.id,
@@ -75,6 +76,13 @@ export function registerSpeechHandlers(ctx: HandlerContext) {
         round: roomData.turn.round,
         speakerId: roomData.turn.speaker?.user_id || "",
       });
+
+      // 7. 全员发言过一轮 → 自动进入自由辩论（B-05），广播阶段变化
+      if (beforePhase !== roomData.phase) {
+        io.to(roomName(debateId)).emit("debate_phase", {
+          phase: roomData.phase,
+        });
+      }
     } catch (err: any) {
       socket.emit("error", err.message || "发言失败");
     }

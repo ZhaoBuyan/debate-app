@@ -8,6 +8,12 @@ export type DebateStatus =
   | "ongoing"
   | "finished"
   | "rejected";
+export type DebatePhase = "formal" | "free" | "summary";
+export const PHASE_LABELS: Record<DebatePhase, string> = {
+  formal: "正式轮辩",
+  free: "自由辩论",
+  summary: "总结陈词",
+};
 export type DebateCategory =
   | "general"
   | "tech"

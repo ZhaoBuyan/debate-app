@@ -1,6 +1,6 @@
 ﻿// server/src/types/socket.ts
 
-import { Debate, DebateStatus } from "./debate";
+import { Debate, DebateStatus, DebatePhase } from "./debate";
 import { Speech, SpeechWithUser } from "./speech";
 import { Message } from "./message";
 import { VoteStats } from "./vote";
@@ -78,6 +78,9 @@ export interface ServerToClientEvents {
     votes: VoteStats;
     support: SupportStats;
     supportHistory?: SupportHistoryPoint[];
+    emotions?: Record<string, number>;
+    phase: DebatePhase;
+    turn?: { round: number; index: number; speaker: any };
   }) => void;
   new_speech: (speech: SpeechWithUser) => void;
   speech_summary: (data: { speechId: number; summary: string }) => void;
@@ -95,6 +98,7 @@ export interface ServerToClientEvents {
   debate_started: () => void;
   debate_ended: () => void;
   round_changed: (data: { round: number; speakerId: string }) => void;
+  debate_phase: (data: { phase: DebatePhase }) => void;
   user_muted: (data: { userId: string; duration: number }) => void;
   user_unmuted: (data: { userId: string }) => void;
   message_recalled: (data: { messageId: number }) => void;

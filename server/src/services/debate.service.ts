@@ -9,6 +9,8 @@ import {
   DebaterWithUser,
   DebateType,
   DebateReport,
+  DebatePhase,
+  PHASE_LABELS,
 } from "../types/index.js";
 import { SpeechWithUser } from "../types/speech.js";
 import { MessageWithUser, VoteStats, SupportStats } from "../types/index.js";
@@ -49,6 +51,8 @@ export interface DebateRoomData {
   support: SupportStats;
   supportHistory: any[];
   emotions: Record<string, number>;
+  /** 辩论阶段：正式轮辩 / 自由辩论 / 总结陈词 */
+  phase: DebatePhase;
   turn: { round: number; index: number; speaker: DebaterWithUser | null };
 }
 
@@ -282,8 +286,75 @@ export class DebateService {
       support,
       supportHistory,
       emotions,
+      phase: await this.getPhase(debateId),
       turn: this.computeTurn(debaters, speeches.length),
     };
+  }
+
+  /**
+   * 辩论阶段计算（B-05 自由辩论 / B-06 总结陈词）
+   * - 落库 phase：'formal'（默认）→ 'free'（管理员触发）→ 'summary'（管理员触发）
+   * - 动态升级：所有辩手均发言过一轮时，formal 自动视为 free（不落库，统一判定）
+   */
+  async getPhase(debateId: string): Promise<DebatePhase> {
+    const db = await getDb();
+    const row = await db.get<{ phase: DebatePhase }>(
+      "SELECT phase FROM debates WHERE id = ?",
+      [debateId],
+    );
+    if (!row) return "formal";
+    if (row.phase !== "formal") return row.phase;
+
+    // 全员已发言 → 自动进入自由辩论（B-05）
+    const [spk, total] = await Promise.all([
+      db.get<{ n: number }>(
+        `SELECT COUNT(DISTINCT user_id) n FROM speeches WHERE debate_id = ?`,
+        [debateId],
+      ),
+      db.get<{ n: number }>(
+        `SELECT COUNT(*) n FROM debaters WHERE debate_id = ?`,
+        [debateId],
+      ),
+    ]);
+    if ((spk?.n || 0) >= (total?.n || 0) && (total?.n || 0) > 0) {
+      return "free";
+    }
+    return "formal";
+  }
+
+  /**
+   * 阶段切换（管理员）：formal → free → summary（单向推进）
+   */
+  async setPhase(
+    debateId: string,
+    next: DebatePhase,
+  ): Promise<{ phase: DebatePhase }> {
+    const db = await getDb();
+    const row = await db.get<{ status: string }>(
+      "SELECT status FROM debates WHERE id = ?",
+      [debateId],
+    );
+    if (!row) throw new Error("辩题不存在");
+    if (row.status !== "ongoing") {
+      throw new Error("只有进行中的辩论可以切换阶段");
+    }
+    // 当前阶段以动态计算为准（全员发言过一轮后 formal 自动视为 free）
+    const current = await this.getPhase(debateId);
+    const valid: Record<DebatePhase, DebatePhase[]> = {
+      formal: ["free"],
+      free: ["summary"],
+      summary: [],
+    };
+    if (next === current) {
+      throw new Error(`当前已经是${PHASE_LABELS[next]}`);
+    }
+    if (!valid[current].includes(next)) {
+      throw new Error(
+        `阶段必须按 正式轮辩 → 自由辩论 → 总结陈词 的顺序推进`,
+      );
+    }
+    await db.run("UPDATE debates SET phase = ? WHERE id = ?", [next, debateId]);
+    return { phase: next };
   }
 
   /**
