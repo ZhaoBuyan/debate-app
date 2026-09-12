@@ -232,9 +232,11 @@ export const api = {
     const res = await http.delete(`/admin/topics/${id}`);
     return unwrap(res as any);
   },
-  /** 排行榜 */
+  /** 排行榜（登录时附带我的名次；游客仅榜单） */
   async leaderboard(type: "points" | "active" = "points"): Promise<LeaderboardPayload> {
-    const res = await http.get("/leaderboard", { params: { type, me: "1" } });
+    const params: Record<string, string> = { type };
+    if (tokenStore.get()) params.me = "1";
+    const res = await http.get("/leaderboard", { params });
     return unwrap(res as any);
   },
   /** 公开个人主页（C4） */

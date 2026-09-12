@@ -21,7 +21,7 @@ export async function getDb(): Promise<Database> {
       filename: path.resolve(altPath),
       driver: sqlite3.Database,
     });
-    await db.exec("PRAGMA foreign_keys = ON;");
+    await applyPragmas(db);
     await createTables(db);
     console.log(`✅ 测试数据库连接成功: ${altPath}`);
     return db;
@@ -40,14 +40,27 @@ export async function getDb(): Promise<Database> {
     driver: sqlite3.Database,
   });
 
-  // 启用外键约束
-  await db.exec("PRAGMA foreign_keys = ON;");
+  // 并发与可靠性加固
+  await applyPragmas(db);
 
   // 创建所有表
   await createTables(db);
 
   console.log("✅ 数据库连接成功，表结构已就绪");
   return db;
+}
+
+/**
+ * SQLite 并发与可靠性基础配置（每个连接生效）：
+ * - WAL：读写并行，提升实时辩论场景下的并发吞吐
+ * - busy_timeout：锁竞争时等待而非立即 SQLITE_BUSY
+ * - synchronous=NORMAL：WAL 下兼顾安全与性能
+ */
+async function applyPragmas(database: Database): Promise<void> {
+  await database.exec("PRAGMA foreign_keys = ON;");
+  await database.exec("PRAGMA journal_mode = WAL;");
+  await database.exec("PRAGMA busy_timeout = 5000;");
+  await database.exec("PRAGMA synchronous = NORMAL;");
 }
 
 /** 关闭数据库连接（测试清理用） */

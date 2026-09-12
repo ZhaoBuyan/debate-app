@@ -21,10 +21,11 @@ function Navbar({ user, isAdmin, onLogout, onToast }: Props) {
 
   const items = [
     { to: "/debates", label: "🏟️ 辩题大厅" },
-    { to: "/create", label: "➕ 创建辩题" },
     { to: "/leaderboard", label: "🏆 排行" },
     { to: "/topics", label: "💡 众创" },
-    { to: "/profile", label: "👤 个人资料" },
+    // 以下入口需登录后展示
+    ...(user ? [{ to: "/create", label: "➕ 创建辩题" }] : []),
+    ...(user ? [{ to: "/profile", label: "👤 个人资料" }] : []),
     ...(isAdmin ? [{ to: "/admin", label: "🛡️ 管理后台" }] : []),
   ];
 
@@ -104,13 +105,22 @@ function Navbar({ user, isAdmin, onLogout, onToast }: Props) {
             onClick={handleExport}
             title="导出我的全部辩论数据（JSON）"
             aria-label="导出我的数据"
-            className="px-2 py-1.5 rounded-lg text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 transition"
+            className={`px-2 py-1.5 rounded-lg text-sm bg-gray-800 hover:bg-gray-700 text-gray-300 transition ${user ? "" : "hidden"}`}
           >
             📦
           </button>
-          <Button variant="ghost" size="sm" onClick={onLogout} className="hidden sm:block">
-            退出
-          </Button>
+          {user ? (
+            <Button variant="ghost" size="sm" onClick={onLogout} className="hidden sm:block">
+              退出
+            </Button>
+          ) : (
+            <Link
+              to="/login"
+              className="px-3.5 py-1.5 rounded-lg text-sm bg-orange-500 hover:bg-orange-600 text-white font-medium transition"
+            >
+              登录 / 注册
+            </Link>
+          )}
           {/* 移动端汉堡 */}
           <button
             type="button"
@@ -153,11 +163,15 @@ function Navbar({ user, isAdmin, onLogout, onToast }: Props) {
             type="button"
             onClick={() => {
               setMenuOpen(false);
-              onLogout();
+              if (user) {
+                onLogout();
+              } else {
+                window.location.href = "/login";
+              }
             }}
             className="w-full text-left px-2 py-2 rounded-lg text-sm text-red-300 hover:bg-gray-800"
           >
-            退出登录
+            {user ? "退出登录" : "登录 / 注册"}
           </button>
         </div>
       )}

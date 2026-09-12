@@ -61,18 +61,27 @@ export interface ServerToClientEvents {
 export type DebateSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socketInstance: DebateSocket | null = null;
+/** 记录建连时所用的 token，登录/登出后自动重建连接 */
+let socketToken: string | null = null;
 
-/** 建立（或复用）socket 连接，token 变化时自动重建 */
+/** 建立（或复用）socket 连接；游客（无 token）也可连接（只读观战） */
 export function getSocket(): DebateSocket {
   const token = tokenStore.get();
-  if (socketInstance && socketInstance.connected) {
+  const tokenChanged = token !== socketToken;
+
+  // token 未变且连接可用 → 直接复用
+  if (socketInstance && !tokenChanged) {
+    if (!socketInstance.connected) socketInstance.connect();
     return socketInstance;
   }
+
   if (socketInstance) {
     socketInstance.disconnect();
   }
+  socketToken = token;
   socketInstance = io({
-    auth: { token },
+    // 无 token 时传 undefined：服务端按游客（只读）处理
+    auth: token ? { token } : {},
     transports: ["websocket", "polling"],
   });
   return socketInstance;
@@ -82,6 +91,7 @@ export function disconnectSocket() {
   if (socketInstance) {
     socketInstance.disconnect();
     socketInstance = null;
+    socketToken = null;
   }
 }
 

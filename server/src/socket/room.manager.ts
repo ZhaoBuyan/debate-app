@@ -52,15 +52,12 @@ export class RoomManager {
     }
   }
 
-  /** 用户加入房间 */
+  /** 用户加入房间（支持匿名只读：游客可实时观战，写操作另行拦截） */
   async join(io: IoServer, socket: IoClient, debateId: string) {
     const user = socket.data.user;
-    if (!user) {
-      socket.emit("error", "未认证，无法加入房间");
-      return;
-    }
+    const effectiveId = user?.id || `guest:${socket.id}`;
     const room = this.getRoom(debateId);
-    const side = await debaterService.getSide(debateId, user.id);
+    const side = user ? await debaterService.getSide(debateId, user.id) : null;
 
     // 加入 socket.io 房间
     socket.join(roomName(debateId));
@@ -68,10 +65,10 @@ export class RoomManager {
 
     room.members.set(socket.id, {
       socketId: socket.id,
-      userId: user.id,
-      username: user.username,
-      avatar: user.avatar || "😊",
-      role: user.role,
+      userId: effectiveId,
+      username: user?.username || "游客",
+      avatar: user?.avatar || "👤",
+      role: user?.role || "guest",
       side,
     });
 
@@ -83,19 +80,30 @@ export class RoomManager {
       socket.emit("error", err.message || "加载房间失败");
     }
 
-    // 下发当前用户个性化状态（是否辩手/我的投票/是否被禁言）
-    const [mySupport, myVotes] = await Promise.all([
-      supportService.getUserSide(debateId, user.id),
-      voteService.hasVoted(debateId, user.id),
-    ]);
-    socket.emit("my_state", {
-      isDebater: !!side,
-      side,
-      mySupport,
-      myBestVote: myVotes.bestTarget,
-      mySideVote: myVotes.side,
-      mutedUntil: room.mutes.get(user.id) || null,
-    });
+    // 下发当前用户个性化状态（游客全部为空）
+    if (user) {
+      const [mySupport, myVotes] = await Promise.all([
+        supportService.getUserSide(debateId, user.id),
+        voteService.hasVoted(debateId, user.id),
+      ]);
+      socket.emit("my_state", {
+        isDebater: !!side,
+        side,
+        mySupport,
+        myBestVote: myVotes.bestTarget,
+        mySideVote: myVotes.side,
+        mutedUntil: room.mutes.get(user.id) || null,
+      });
+    } else {
+      socket.emit("my_state", {
+        isDebater: false,
+        side: null,
+        mySupport: null,
+        myBestVote: null,
+        mySideVote: null,
+        mutedUntil: null,
+      });
+    }
 
     // 广播新人加入（仅对辩手进行提示，避免刷屏）
     const member = room.members.get(socket.id);

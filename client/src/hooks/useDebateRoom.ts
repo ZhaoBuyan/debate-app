@@ -48,15 +48,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
     [pushToast],
   );
 
-  // 连接 + 事件订阅
+  // 连接 + 事件订阅（游客 userId 为空时也连接，仅只读观战）
   useEffect(() => {
-    if (!debateId || !userId) return;
+    if (!debateId) return;
     const socket = getSocket();
     socketRef.current = socket;
 
     const onConnect = () => {
       setConnected(true);
-      socket.emit("join_room", { debateId, userId });
+      socket.emit("join_room", { debateId, userId: userId || "" });
     };
     const onDisconnect = () => setConnected(false);
     const onError = (message: string) => showError(message);
@@ -130,12 +130,12 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
     };
     const onDebateStarted = () => {
       pushToast("success", "🎉 辩论开始了！");
-      socket.emit("join_room", { debateId, userId });
+      socket.emit("join_room", { debateId, userId: userId || "" });
     };
     const onDebateEnded = () => {
       setEnded(true);
       pushToast("info", "🏁 辩论已结束");
-      socket.emit("join_room", { debateId, userId }); // 刷新终态
+      socket.emit("join_room", { debateId, userId: userId || "" }); // 刷新终态
     };
     const onDebatePhase = (data: { phase: "formal" | "free" | "summary" }) => {
       setPhase(data.phase);
@@ -212,7 +212,7 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       socket.off("user_muted", onUserMuted);
       socket.off("user_unmuted", onUserUnmuted);
       socket.off("message_recalled", onMessageRecalled);
-      socket.emit("leave_room", { debateId, userId });
+      socket.emit("leave_room", { debateId, userId: userId || "" });
     };
   }, [debateId, userId, pushToast, showError]);
 
@@ -222,11 +222,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       const uid = userIdRef.current;
-      if (!s || !id || !uid) return false;
+      if (!s || !id) return false;
+      if (!uid) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("speech", { debateId: id, userId: uid, content, inputType });
       return true;
     },
-    [],
+    [showError],
   );
 
   const sendChat = useCallback(
@@ -234,11 +238,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       const uid = userIdRef.current;
-      if (!s || !id || !uid) return false;
+      if (!s || !id) return false;
+      if (!uid) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("send_message", { debateId: id, userId: uid, content });
       return true;
     },
-    [],
+    [showError],
   );
 
   const sendSupport = useCallback(
@@ -246,11 +254,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       const uid = userIdRef.current;
-      if (!s || !id || !uid) return false;
+      if (!s || !id) return false;
+      if (!uid) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("support", { debateId: id, userId: uid, side });
       return true;
     },
-    [],
+    [showError],
   );
 
   const sendVoteBest = useCallback(
@@ -258,11 +270,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       const uid = userIdRef.current;
-      if (!s || !id || !uid) return false;
+      if (!s || !id) return false;
+      if (!uid) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("vote_best", { debateId: id, voterId: uid, targetUserId });
       return true;
     },
-    [],
+    [showError],
   );
 
   const sendVoteSide = useCallback(
@@ -270,11 +286,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       const uid = userIdRef.current;
-      if (!s || !id || !uid) return false;
+      if (!s || !id) return false;
+      if (!uid) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("vote_side", { debateId: id, voterId: uid, side });
       return true;
     },
-    [],
+    [showError],
   );
 
   const sendEmotion = useCallback(
@@ -282,11 +302,15 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       const uid = userIdRef.current;
-      if (!s || !id || !uid) return false;
+      if (!s || !id) return false;
+      if (!uid) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("emotion", { debateId: id, userId: uid, type, speechId });
       return true;
     },
-    [],
+    [showError],
   );
 
   const sendReport = useCallback(
@@ -300,10 +324,14 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
       const s = socketRef.current;
       const id = debateIdRef.current;
       if (!s || !id) return false;
+      if (!userIdRef.current) {
+        showError("请先登录后再参与互动");
+        return false;
+      }
       s.emit("report", { debateId: id, ...payload });
       return true;
     },
-    [],
+    [showError],
   );
 
   /** 重新拉取房间状态（room_state + my_state） */
@@ -311,8 +339,8 @@ export function useDebateRoom(debateId: string | undefined, userId: string | und
     const s = socketRef.current;
     const id = debateIdRef.current;
     const uid = userIdRef.current;
-    if (s && id && uid) {
-      s.emit("join_room", { debateId: id, userId: uid });
+    if (s && id) {
+      s.emit("join_room", { debateId: id, userId: uid || "" });
     }
   }, []);
 

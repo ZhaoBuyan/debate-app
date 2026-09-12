@@ -41,6 +41,7 @@ export function registerChatHandlers(ctx: HandlerContext) {
         return socket.emit("error", "请先加入该辩论房间");
       }
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       const remain = rooms.mutedRemainMs(debateId, user.id);
       if (remain) {
         return socket.emit(
@@ -70,6 +71,7 @@ export function registerChatHandlers(ctx: HandlerContext) {
       const debateId = debateOf(ctx);
       if (!debateId || debateId !== data.debateId) return;
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       await chatService.addEmotion({
         debateId,
         userId: user.id,
@@ -97,6 +99,7 @@ export function registerChatHandlers(ctx: HandlerContext) {
       const debateId = debateOf(ctx);
       if (!debateId || debateId !== data.debateId) return;
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       const filtered = await sensitiveService.filterText(
         (data.gesture || "").slice(0, 200),
       );
@@ -121,6 +124,7 @@ export function registerChatHandlers(ctx: HandlerContext) {
         return socket.emit("error", "举报提交过于频繁，请稍后再试");
       }
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       if (data.targetUserId === user.id) {
         return socket.emit("error", "不能举报自己");
       }

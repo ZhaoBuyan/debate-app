@@ -1,30 +1,36 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import DebateList from "./pages/DebateList";
-import DebateRoom from "./pages/DebateRoom";
-import CreateDebate from "./pages/CreateDebate";
-import AdminPanel from "./pages/AdminPanel";
-import Profile from "./pages/Profile";
-import PublicProfile from "./pages/PublicProfile";
-import Leaderboard from "./pages/Leaderboard";
-import Topics from "./pages/Topics";
-import DebateChain from "./pages/DebateChain";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import useAuth from "./hooks/useAuth";
 import { tokenStore } from "./api";
 import Loading from "./components/common/Loading";
+
+// 非首屏页面按路由懒加载（代码分割，降低首屏体积）
+const DebateRoom = lazy(() => import("./pages/DebateRoom"));
+const CreateDebate = lazy(() => import("./pages/CreateDebate"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const Profile = lazy(() => import("./pages/Profile"));
+const PublicProfile = lazy(() => import("./pages/PublicProfile"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Topics = lazy(() => import("./pages/Topics"));
+const DebateChain = lazy(() => import("./pages/DebateChain"));
+
+function PageLoading() {
+  return (
+    <div className="min-h-screen app-bg flex items-center justify-center">
+      <Loading text="加载中..." />
+    </div>
+  );
+}
 
 /** 登录守卫 */
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const { user, loading } = useAuth(true);
   const location = useLocation();
   if (loading) {
-    return (
-      <div className="min-h-screen app-bg flex items-center justify-center">
-        <Loading text="登录校验中..." />
-      </div>
-    );
+    return <PageLoading />;
   }
   if (!user && !tokenStore.get()) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
@@ -60,14 +66,16 @@ function AppRoutes() {
           </GuestOnly>
         }
       />
-      <Route
-        path="/debates"
-        element={
-          <RequireAuth>
-            <DebateList />
-          </RequireAuth>
-        }
-      />
+
+      {/* ---------- 公开页面（游客可浏览，互动时引导登录） ---------- */}
+      <Route path="/debates" element={<DebateList />} />
+      <Route path="/debate/:id" element={<DebateRoom />} />
+      <Route path="/u/:id" element={<PublicProfile />} />
+      <Route path="/leaderboard" element={<Leaderboard />} />
+      <Route path="/topics" element={<Topics />} />
+      <Route path="/chain/:id" element={<DebateChain />} />
+
+      {/* ---------- 需登录 ---------- */}
       <Route
         path="/create"
         element={
@@ -77,50 +85,10 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/debate/:id"
-        element={
-          <RequireAuth>
-            <DebateRoom />
-          </RequireAuth>
-        }
-      />
-      <Route
         path="/profile"
         element={
           <RequireAuth>
             <Profile />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/topics"
-        element={
-          <RequireAuth>
-            <Topics />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/leaderboard"
-        element={
-          <RequireAuth>
-            <Leaderboard />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/u/:id"
-        element={
-          <RequireAuth>
-            <PublicProfile />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/chain/:id"
-        element={
-          <RequireAuth>
-            <DebateChain />
           </RequireAuth>
         }
       />
@@ -134,6 +102,7 @@ function AppRoutes() {
           </RequireAuth>
         }
       />
+
       <Route path="/" element={<Navigate to="/debates" replace />} />
       <Route path="*" element={<Navigate to="/debates" replace />} />
     </Routes>
@@ -144,7 +113,9 @@ function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
-        <AppRoutes />
+        <Suspense fallback={<PageLoading />}>
+          <AppRoutes />
+        </Suspense>
       </ErrorBoundary>
     </BrowserRouter>
   );

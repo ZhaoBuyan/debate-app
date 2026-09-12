@@ -26,6 +26,7 @@ export function registerSpeechHandlers(ctx: HandlerContext) {
         return socket.emit("error", "请先加入辩论房间");
       }
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
 
       // 0. 防刷屏：发言限流
       const rule = RATE_RULES.speech;

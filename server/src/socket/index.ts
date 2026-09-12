@@ -24,11 +24,16 @@ export const ADMIN_ROOM = "admins";
  * 2. 连接后注册全部房间事件处理器
  */
 export const setupSocket = (io: IoServer) => {
-  // ---- 握手认证 ----
+  // ---- 握手认证（未登录允许匿名连接，仅可只读观战） ----
   io.use(async (socket, next) => {
     try {
       const token = (socket.handshake.auth as any)?.token;
-      if (!token) return next(new Error("未认证，请先登录"));
+      if (!token) {
+        // 游客：允许连接，写操作在各自 handler 中拒绝并提示登录
+        socket.data.user = null;
+        socket.data.anonymous = true;
+        return next();
+      }
 
       const decoded = jwt.verify(token, config.jwtSecret) as {
         userId: string;

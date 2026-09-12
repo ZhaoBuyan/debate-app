@@ -420,7 +420,7 @@ function DebateRoom() {
   }
 
   const status = debate!.status;
-  const canJoin = status === "waiting" && my && !my.isDebater;
+  const canJoin = status === "waiting" && !!user && my && !my.isDebater;
   const showVotePanel = status === "ongoing" || status === "finished";
   const canSpeak = status === "ongoing" && !!my?.isDebater && !mutedRemain;
   const A = debaters.filter((d) => d.side === "A");
@@ -587,6 +587,19 @@ function DebateRoom() {
             )}
           </div>
         </header>
+
+        {/* 游客只读模式提示 */}
+        {!user && (
+          <div className="mb-4 rounded-xl border border-cyan-500/30 bg-cyan-500/[0.07] px-4 py-2.5 text-sm text-cyan-200 flex flex-wrap items-center gap-2">
+            <span>👀 游客模式：实时观战中，发言 / 投票 / 聊天等互动需登录</span>
+            <Link
+              to="/login"
+              className="ml-auto text-xs px-3 py-1 rounded-lg bg-cyan-600/80 hover:bg-cyan-600 text-white transition"
+            >
+              登录参与
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* ============ 左 2/3：辩论区 ============ */}

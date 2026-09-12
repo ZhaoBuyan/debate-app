@@ -26,6 +26,7 @@ export function registerVoteHandlers(ctx: HandlerContext) {
         return socket.emit("error", "请先加入辩论房间");
       }
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       const rule = RATE_RULES.vote;
       if (!rateLimiter.tryAcquire(`${user.id}:vote`, rule.limit, rule.windowMs)) {
         return socket.emit("error", "操作太快啦，请稍后再试");
@@ -53,6 +54,7 @@ export function registerVoteHandlers(ctx: HandlerContext) {
         return socket.emit("error", "请先加入辩论房间");
       }
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       const rule = RATE_RULES.vote;
       if (!rateLimiter.tryAcquire(`${user.id}:vote`, rule.limit, rule.windowMs)) {
         return socket.emit("error", "操作太快啦，请稍后再试");
@@ -77,6 +79,7 @@ export function registerVoteHandlers(ctx: HandlerContext) {
     try {
       const debateId = data.debateId;
       const user = socket.data.user;
+      if (!user) return socket.emit("error", "请先登录后再参与互动");
       const side = await debaterService.getSide(debateId, user.id);
       const mySupport = await supportService.getUserSide(debateId, user.id);
       const myVotes = await voteService.hasVoted(debateId, user.id);
